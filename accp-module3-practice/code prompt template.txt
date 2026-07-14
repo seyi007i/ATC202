@@ -1,0 +1,17 @@
+code prompt template
+
+ Language [version] · Framework [name and version] · Code style [PEP 8 / Airbnb / other] · All functions must include docstrings / JSDoc comments · Unit tests required for all non-trivial functions using [pytest/Jest/other] · Error handling must cover [specific error categories relevant to your domain].
+
+
+Here's a Python version of that template tailored for a Nigerian phone number validation project:
+
+* **Language:** Python 3.12
+* **Framework:** Standard Library (no framework) or Flask 3.x (if building an API)
+* **Code style:** PEP 8
+* **Documentation:** All functions must include Google-style or NumPy-style docstrings.
+* **Unit tests:** Required for all non-trivial functions using `pytest`.
+* **Error handling:** Must cover invalid input types, empty or missing values, malformed phone numbers, unsupported country codes, invalid Nigerian network prefixes, and incorrect phone number lengths.
+
+If you're only writing a reusable validation library (not an API), a concise version is:
+
+Language: Python 3.12 Framework: None (Standard Library) · Code style: PEP 8 · All functions must include Google-style docstrings · Unit tests required for all non-trivial functions using pytest · Error handling must cover invalid input types, empty inputs, malformed phone numbers, invalid Nigerian prefixes, unsupported country codes, and incorrect phone number lengths.
