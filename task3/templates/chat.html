@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Chat — SafeBank Companion{% endblock %}
+
+{% block content %}
+<section class="chat-layout">
+  <div class="chat-column">
+    <div id="fraud-banner" class="fraud-banner hidden" role="alert"></div>
+
+    <div id="chat-window" class="chat-window" aria-live="polite">
+      <div class="message assistant">
+        <div class="bubble">
+          Hello! I'm SafeBank Companion. Paste a suspicious message, describe
+          what happened, or ask me anything about staying safe from mobile
+          money scams.
+        </div>
+      </div>
+    </div>
+
+    <div id="loading-indicator" class="loading-indicator hidden">
+      SafeBank Companion is thinking…
+    </div>
+
+    <div id="error-banner" class="error-banner hidden" role="alert"></div>
+
+    <form id="chat-form" class="chat-input-row">
+      <label class="sr-only" for="message-input">Your message</label>
+      <textarea
+        id="message-input"
+        placeholder="Paste a suspicious message or ask a question…"
+        rows="2"
+        required
+      ></textarea>
+      <button id="send-button" type="submit">Send</button>
+    </form>
+  </div>
+
+  <aside class="side-column">
+    <div id="risk-card" class="risk-card hidden">
+      <h2>Risk Assessment</h2>
+      <p class="risk-level">
+        Risk level: <span id="risk-level-value">—</span>
+      </p>
+      <p class="risk-confidence">
+        Confidence: <span id="risk-confidence-value">—</span>
+      </p>
+      <h3>Red Flags</h3>
+      <ul id="risk-flags-list"></ul>
+    </div>
+
+    <div id="suggested-actions-card" class="suggested-actions-card hidden">
+      <h2>Recommended Actions</h2>
+      <ul id="suggested-actions-list"></ul>
+    </div>
+  </aside>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/chat.js"></script>
+{% endblock %}
