@@ -81,20 +81,40 @@ Use only the structured analysis you receive.
 Return valid JSON."""
 
 
-def build_extraction_user_message(document_text: str) -> str:
+def build_extraction_user_message(
+    document_text: str, *, part_index: int = 0, part_count: int = 1
+) -> str:
     """Build the user-turn message sent to the Extraction Agent.
 
     Args:
-        document_text: The raw document text to extract structure from.
+        document_text: The raw document text (or chunk of it) to extract
+            structure from.
+        part_index: The zero-based index of this chunk, if the document was
+            split into multiple parts.
+        part_count: The total number of chunks the document was split into.
+            ``1`` means the document was sent whole, in a single call.
 
     Returns:
         The user message, instructing the exact required JSON shape.
     """
+    shape_instruction = (
+        "Return a single JSON object with exactly this shape: "
+        '{"title": str, "metadata": object, "sections": '
+        '[{"heading": str, "content": str}, ...]}.'
+    )
+    if part_count == 1:
+        return (
+            f"Extract the structure of the following document. {shape_instruction}\n\n"
+            f"Document:\n{document_text}"
+        )
     return (
-        "Extract the structure of the following document. Return a single "
-        'JSON object with exactly this shape: {"title": str, "metadata": '
-        'object, "sections": [{"heading": str, "content": str}, ...]}.\n\n'
-        f"Document:\n{document_text}"
+        f"This is part {part_index + 1} of {part_count} of a single document, "
+        "split only because of length. Extract the structure of this part "
+        'the same way you would a whole document: still populate "title" and '
+        '"metadata" using whatever this part contains (they will only be '
+        "used from the first part), and treat this part's content as its "
+        f"own sections. {shape_instruction}\n\n"
+        f"Document (part {part_index + 1} of {part_count}):\n{document_text}"
     )
 
 

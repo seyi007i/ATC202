@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
 
+from document_pipeline import config
 from document_pipeline.extraction import extraction_agent
 from document_pipeline.models import (
     AnthropicAPIError,
@@ -33,8 +35,6 @@ def test_happy_path_returns_extracted_document(valid_extraction_json: str) -> No
 
 def test_handles_markdown_fenced_json(valid_extraction_dict: dict[str, Any]) -> None:
     """A response wrapped in a markdown code fence should still parse."""
-    import json
-
     fenced = f"```json\n{json.dumps(valid_extraction_dict)}\n```"
     client = FakeAgentClient(fenced)
 
@@ -83,3 +83,138 @@ def test_empty_text_raises_without_calling_client() -> None:
         extraction_agent("   ", client=client)
 
     assert client.calls == []
+
+
+class TestChunkedExtraction:
+    """Tests for extraction of documents split into multiple chunks."""
+
+    @pytest.fixture(autouse=True)
+    def _small_chunk_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Force a tiny chunk size so a short test document still splits."""
+        monkeypatch.setattr(config, "EXTRACTION_CHUNK_MAX_CHARS", 40)
+
+    def test_long_document_makes_one_call_per_chunk(self) -> None:
+        """A document that splits into N chunks should call the client N times."""
+        document_text = "\n\n".join(f"Paragraph {i}." + "x" * 30 for i in range(4))
+        chunk_responses = [
+            json.dumps(
+                {
+                    "title": "Doc",
+                    "metadata": {},
+                    "sections": [{"heading": f"Chunk {i}", "content": f"content {i}"}],
+                }
+            )
+            for i in range(4)
+        ]
+        client = FakeAgentClient(chunk_responses)
+
+        result = extraction_agent(document_text, client=client)
+
+        assert len(client.calls) == 4
+        assert [section.heading for section in result.sections] == [
+            "Chunk 0",
+            "Chunk 1",
+            "Chunk 2",
+            "Chunk 3",
+        ]
+
+    def test_merge_uses_first_chunks_title_and_metadata(self) -> None:
+        """The merged document's title/metadata should come from the first chunk only."""
+        document_text = "\n\n".join(f"Paragraph {i}." + "x" * 30 for i in range(2))
+        chunk_responses = [
+            json.dumps(
+                {
+                    "title": "First Chunk Title",
+                    "metadata": {"source": "chunk-0"},
+                    "sections": [{"heading": "A", "content": "a"}],
+                }
+            ),
+            json.dumps(
+                {
+                    "title": "Second Chunk Title",
+                    "metadata": {"source": "chunk-1"},
+                    "sections": [{"heading": "B", "content": "b"}],
+                }
+            ),
+        ]
+        client = FakeAgentClient(chunk_responses)
+
+        result = extraction_agent(document_text, client=client)
+
+        assert result.title == "First Chunk Title"
+        assert result.metadata == {"source": "chunk-0"}
+
+    def test_merge_renumbers_auto_generated_section_headings(self) -> None:
+        """Each chunk's independently-numbered 'Section N' headings should be
+        renumbered sequentially across the merged document, not duplicated."""
+        document_text = "\n\n".join(f"Paragraph {i}." + "x" * 30 for i in range(2))
+        chunk_responses = [
+            json.dumps(
+                {
+                    "title": "Doc",
+                    "metadata": {},
+                    "sections": [
+                        {"heading": "Section 1", "content": "chunk0 sec1"},
+                        {"heading": "Section 2", "content": "chunk0 sec2"},
+                    ],
+                }
+            ),
+            json.dumps(
+                {
+                    "title": "Doc",
+                    "metadata": {},
+                    "sections": [{"heading": "Section 1", "content": "chunk1 sec1"}],
+                }
+            ),
+        ]
+        client = FakeAgentClient(chunk_responses)
+
+        result = extraction_agent(document_text, client=client)
+
+        assert [section.heading for section in result.sections] == [
+            "Section 1",
+            "Section 2",
+            "Section 3",
+        ]
+        assert result.sections[2].content == "chunk1 sec1"
+
+    def test_real_section_headings_are_left_untouched(self) -> None:
+        """Genuine (non-auto-generated) headings should pass through unchanged."""
+        document_text = "\n\n".join(f"Paragraph {i}." + "x" * 30 for i in range(2))
+        chunk_responses = [
+            json.dumps(
+                {
+                    "title": "Doc",
+                    "metadata": {},
+                    "sections": [{"heading": "Introduction", "content": "intro"}],
+                }
+            ),
+            json.dumps(
+                {
+                    "title": "Doc",
+                    "metadata": {},
+                    "sections": [{"heading": "Section 1", "content": "auto"}],
+                }
+            ),
+        ]
+        client = FakeAgentClient(chunk_responses)
+
+        result = extraction_agent(document_text, client=client)
+
+        assert [section.heading for section in result.sections] == ["Introduction", "Section 1"]
+
+    def test_chunk_user_message_mentions_part_position(self) -> None:
+        """Each chunk's user message should say which part it is, out of how many."""
+        document_text = "\n\n".join(f"Paragraph {i}." + "x" * 30 for i in range(2))
+        chunk_responses = [
+            json.dumps({"title": "Doc", "metadata": {}, "sections": [{"heading": "A", "content": "a"}]}),
+            json.dumps({"title": "Doc", "metadata": {}, "sections": [{"heading": "B", "content": "b"}]}),
+        ]
+        client = FakeAgentClient(chunk_responses)
+
+        extraction_agent(document_text, client=client)
+
+        _, first_message, _ = client.calls[0]
+        _, second_message, _ = client.calls[1]
+        assert "part 1 of 2" in first_message
+        assert "part 2 of 2" in second_message

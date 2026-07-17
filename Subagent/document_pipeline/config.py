@@ -22,6 +22,13 @@ EXTRACTION_MAX_TOKENS: int = 8192
 ANALYSIS_MAX_TOKENS: int = 8192
 SYNTHESIS_MAX_TOKENS: int = 4096
 
+#: Target maximum character length of a single extraction chunk's raw text.
+#: Documents longer than this are split (on paragraph boundaries, see
+#: document_pipeline.chunking) into multiple chunks, each extracted
+#: independently and merged, so a single chunk's echoed-verbatim JSON
+#: output stays comfortably under EXTRACTION_MAX_TOKENS.
+EXTRACTION_CHUNK_MAX_CHARS: int = 20000
+
 #: Per-request timeout, in seconds, for calls to the Anthropic API.
 REQUEST_TIMEOUT_SECONDS: float = 120.0
 
